@@ -1,0 +1,139 @@
+*******************************************************
+*  Cas test de l'implantation numérique du modele
+*MAZAR
+
+*-----------------------------------------------------
+OPTI TRAC PSC;
+*-----------------------------------------------------
+
+*******************************************************
+
+*
+*-------------- Options de calcul ---------------------
+*
+OPTION DIME 3 ELEM CUB8;
+
+*
+*-------------- Definition de la geometrie ------------
+*
+P1 = 0. 0. 0.;
+P2 = 1. 0. 0.;
+P3 = 1. .1 0.;
+P4 = 0. .1 0.;
+P5 = 0. 0. 1. ;
+
+L1 = P1 DROIT 1 P2 ;
+L2 = P2 DROIT 1 P3 ;
+L3 = P3 DROIT 1 P4 ;
+L4 = P4 DROIT 1 P1 ;
+
+LTOT = L1 ET L2 ET L3 ET L4 ;
+SURF1 = SURF LTOT PLANE;
+VOLTO =VOLU SURF1 1 TRANS P5;
+SURF2= FACE VOLTO 2;
+
+VOLTOT = VOLTO;
+*TRAC VOLTOT;
+*
+*------- Définition des conditions aux limites --------
+*----------- et des déplacements imposés --------------
+*
+CL  = BLOQ SURF1 UZ;
+CLL = BLOQ L1 'DEPL';
+CL1 = BLOQ SURF2 Uz;
+
+D1 = DEPI CL1 1.;
+
+*----- Définition du modèle --------------------------- 
+* 
+* Doc file parametres.txt, file nay ong luu cac tham so can optimiser
+fidon1 = 'parametres.txt' ;
+OPTI ACQU fidon1 ;
+ACQU EBETON*FLOTTANT ;
+ACQU NIU*FLOTTANT ;
+ACQU FTRAC*FLOTTANT ;
+ACQU FRACResi*FLOTTANT ;
+ACQU FRAG*FLOTTANT ;
+ACQU FCOM*FLOTTANT ;
+ACQU EPIC*FLOTTANT ;
+* 
+*----- Paramètres matériaux --------------------------- 
+* 1.Module d'Young 
+* 2.Coefficient de Poisson 
+* 3.Résistance en traction 
+* 4.Fragilité en traction 
+* 5.Deformation max en compression 
+* 6.Residual tensile strength  
+* 7.Resistance en compression  
+
+****************************************************************** ;
+epsd0 at bt ac bc = IDENTI MAZARS EBETON NIU FTRAC FRACResi 
+FRAG FCOM EPIC ;
+************************
+****************************************************************** ;
+MODL1  = MODE VOLTOT MECANIQUE ELASTIQUE ISOTROPE 
+ENDOMMAGEMENT MAZARS;                                               
+MATE1  = MATE  MODL1 'YOUN' EBETON 'NU' NIU 
+'RHO' 2500. 'BTRA' bt 'KTR0' epsd0 'ATRA' at 'ACOM' ac 
+'BCOM' bc 'BETA' 1.06     ;
+    
+
+*-----------Définition des cas d'études-----------------
+* 1.Module d'Young (25GPa - 40GPa) 
+* 2.Coefficient de Poisson (0.2-0.3)
+* 3.Résistance en traction (2.5 4 MPa)
+* 4.Fragilité en traction (0.005 - 0.02 J-1.m3)
+* 5.Deformation max en compression (2.E-3-6E-3)
+* 6.Residual tensile strength (0.2E6 - 1.2E6)
+* 7.Résistance en compression (25 40 MPa)
+
+*----- Définition des cas de charge ------------------- 
+
+LI1  = PROG 0. 1.; 
+LI2  = PROG 0. 4.0e-4; 
+LIS1 = PROG 0. PAS 0.05 1.; 
+
+EV = EVOL MANU LI1 LI2 ; 
+CHA1 = CHAR 'DIMP' D1 EV ;
+*----------- Calcul par l'operateur PASAPAS ------------ 
+* 
+SI (EGA nloc0 1); 
+    LC = 0.000001; 
+    CO1 = CONNEC mod1 LC NORMAL; 
+FINSI; 
+
+TAB1 = TABLE ; 
+TAB1.'BLOCAGES_MECANIQUES' = CL ET CLL ET CL1; 
+TAB1.'MODELE' = MODL1; 
+TAB1.'MOVA' = 'D   '; 
+TAB1.'CHARGEMENT' = CHA1; 
+TAB1.'CARACTERISTIQUES' = MATE1; 
+TAB1.'TEMPS_CALCULES' = LIS1; 
+
+SI (EGA nloc0 1); 
+    TAB1.NON_LOCAL=VRAI; 
+    TAB1.LVIAM=MOTS EPTI; 
+    TAB1.LCAR=LC; 
+    TAB1.CONN = CO1; 
+FINSI; 
+
+PASAPAS TAB1 ; 
+            
+* 
+*----------- Courbe effort-deplacement ----------------- 
+*
+ev2=@global tab1 CL1 EV FZ; 
+DESS EV2; 
+
+tabsor = TABL;
+tabsor.'AxeX' = EXTR EV2 'ABSC';
+tabsor.'AxeY' = EXTR EV2 'ORDO';
+
+KH= CHAI 'Numerique';
+OPTI SORT KH;
+*SORT 'EXCE' tabsor;
+SORT 'EXCE' EV2;    
+FIN;
+
+
+
